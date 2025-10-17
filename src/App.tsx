@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import SatelliteView from './components/SatelliteView';
 import UAVMonitoring from './components/UAVMonitoring';
 import SensorNetwork from './components/SensorNetwork';
+import RealTimeDetection from './components/RealTimeDetection';
 import AlertCenter from './components/AlertCenter';
 import EnvironmentalQuotes from './components/EnvironmentalQuotes';
 import { AlertProvider } from './context/AlertContext';
@@ -21,6 +22,8 @@ function App() {
         return <UAVMonitoring />;
       case 'sensors':
         return <SensorNetwork />;
+      case 'realtime':
+        return <RealTimeDetection />;
       case 'alerts':
         return <AlertCenter />;
       default:

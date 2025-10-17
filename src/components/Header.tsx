@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Satellite, Plane, Radio, AlertTriangle } from 'lucide-react';
+import { Shield, Satellite, Plane, Radio, AlertTriangle, Camera } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -12,6 +12,7 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     { id: 'satellite', label: 'Satellite', icon: Satellite },
     { id: 'uav', label: 'UAV Monitoring', icon: Plane },
     { id: 'sensors', label: 'Sensors', icon: Radio },
+    { id: 'realtime', label: 'Live Detection', icon: Camera },
     { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
   ];
 
