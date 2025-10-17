@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
+import SatelliteView from './components/SatelliteView';
+import UAVMonitoring from './components/UAVMonitoring';
 import SensorNetwork from './components/SensorNetwork';
 import RealTimeDetection from './components/RealTimeDetection';
 import AlertCenter from './components/AlertCenter';
@@ -14,6 +16,10 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'satellite':
+        return <SatelliteView />;
+      case 'uav':
+        return <UAVMonitoring />;
       case 'sensors':
         return <SensorNetwork />;
       case 'realtime':
