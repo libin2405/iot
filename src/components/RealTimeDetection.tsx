@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { Camera, Wifi, WifiOff, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { Camera, Wifi, WifiOff, AlertTriangle, CheckCircle, Activity, Play, Square, Power } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { AlertContext } from '../context/AlertContext';
 
@@ -11,13 +11,17 @@ interface DetectionResult {
 const RealTimeDetection: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [detectionHistory, setDetectionHistory] = useState<Array<DetectionResult & { timestamp: Date }>>([]);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { addAlert } = useContext(AlertContext);
 
-  useEffect(() => {
-    // Connect to Flask-SocketIO backend
+  const connectToServer = () => {
+    if (socket) return;
+
     const newSocket = io('http://localhost:5000');
     
     newSocket.on('connect', () => {
@@ -28,6 +32,7 @@ const RealTimeDetection: React.FC = () => {
     newSocket.on('disconnect', () => {
       console.log('Disconnected from detection server');
       setIsConnected(false);
+      setIsCameraActive(false);
     });
 
     newSocket.on('prediction_result', (data: DetectionResult) => {
@@ -61,11 +66,64 @@ const RealTimeDetection: React.FC = () => {
     });
 
     setSocket(newSocket);
+  };
 
+  const disconnectFromServer = () => {
+    if (socket) {
+      socket.close();
+      setSocket(null);
+      setIsConnected(false);
+      setIsCameraActive(false);
+      setDetectionResult(null);
+      setDetectionHistory([]);
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'environment' // Use back camera on mobile if available
+        } 
+      });
+      
+      setStream(mediaStream);
+      setIsCameraActive(true);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Unable to access camera. Please check permissions.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+      setIsCameraActive(false);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+  };
+
+  useEffect(() => {
     return () => {
-      newSocket.close();
+      // Cleanup on component unmount
+      if (socket) {
+        socket.close();
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
     };
-  }, [addAlert]);
+  }, [socket, stream]);
 
   const getDetectionColor = (prediction: string) => {
     switch (prediction) {
@@ -93,43 +151,105 @@ const RealTimeDetection: React.FC = () => {
             <Camera className="w-6 h-6 text-blue-600" />
             <h2 className="text-xl font-semibold text-gray-800">Real-Time Fire Detection</h2>
           </div>
-          <div className="flex items-center space-x-2">
-            {isConnected ? (
-              <div className="flex items-center space-x-2 text-green-600">
-                <Wifi className="w-4 h-4" />
-                <span className="text-sm">Connected</span>
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 text-red-600">
-                <WifiOff className="w-4 h-4" />
-                <span className="text-sm">Disconnected</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Current Detection Status */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-gray-900 rounded-lg p-4 flex items-center justify-center min-h-64">
-            <div className="text-center text-white">
-              <Camera className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <div className="text-lg font-medium">Live Camera Feed</div>
-              <div className="text-sm text-gray-400 mt-2">
-                AI analyzing video stream in real-time
-              </div>
-              {lastUpdate && (
-                <div className="text-xs text-gray-500 mt-2">
-                  Last frame: {lastUpdate.toLocaleTimeString()}
+          <div className="flex items-center space-x-4">
+            {/* Connection Status */}
+            <div className="flex items-center space-x-2">
+              {isConnected ? (
+                <div className="flex items-center space-x-2 text-green-600">
+                  <Wifi className="w-4 h-4" />
+                  <span className="text-sm">Connected</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2 text-red-600">
+                  <WifiOff className="w-4 h-4" />
+                  <span className="text-sm">Disconnected</span>
                 </div>
               )}
             </div>
+            
+            {/* Control Buttons */}
+            <div className="flex space-x-2">
+              {!isConnected ? (
+                <button
+                  onClick={connectToServer}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Power className="w-4 h-4" />
+                  <span>Connect</span>
+                </button>
+              ) : (
+                <button
+                  onClick={disconnectFromServer}
+                  className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <Power className="w-4 h-4" />
+                  <span>Disconnect</span>
+                </button>
+              )}
+              
+              {!isCameraActive ? (
+                <button
+                  onClick={startCamera}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>Start Camera</span>
+                </button>
+              ) : (
+                <button
+                  onClick={stopCamera}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  <Square className="w-4 h-4" />
+                  <span>Stop Camera</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Video Feed and Detection Results */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Video Feed */}
+          <div className="bg-gray-900 rounded-lg overflow-hidden">
+            {isCameraActive ? (
+              <div className="relative">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-64 object-cover"
+                />
+                <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <span>LIVE</span>
+                </div>
+                {lastUpdate && (
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                    Last analysis: {lastUpdate.toLocaleTimeString()}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-white">
+                <div className="text-center">
+                  <Camera className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <div className="text-lg font-medium">Camera Feed</div>
+                  <div className="text-sm text-gray-400 mt-2">
+                    Click "Start Camera" to begin live detection
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Detection Results */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-800">Current Detection</h3>
             
-            {detectionResult ? (
+            {detectionResult && isConnected ? (
               <div className={`border-2 rounded-lg p-4 ${getDetectionColor(detectionResult.prediction)}`}>
                 <div className="flex items-center space-x-3 mb-2">
                   {React.createElement(getDetectionIcon(detectionResult.prediction), { 
@@ -151,7 +271,7 @@ const RealTimeDetection: React.FC = () => {
               </div>
             ) : (
               <div className="border-2 border-gray-200 rounded-lg p-4 text-center text-gray-500">
-                {isConnected ? 'Waiting for detection results...' : 'Connect to detection server'}
+                {isConnected ? 'Waiting for detection results...' : 'Connect to detection server to start analysis'}
               </div>
             )}
 
@@ -233,19 +353,19 @@ const RealTimeDetection: React.FC = () => {
             <h4 className="font-medium text-gray-700 mb-3">Camera Settings</h4>
             <div className="space-y-3">
               <div>
+                <label className="block text-sm text-gray-600 mb-1">Video Quality</label>
+                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="640x480">640x480 (Standard)</option>
+                  <option value="1280x720">1280x720 (HD)</option>
+                  <option value="1920x1080">1920x1080 (Full HD)</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-sm text-gray-600 mb-1">Detection Frequency</label>
                 <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="10">10 FPS</option>
                   <option value="5">5 FPS</option>
                   <option value="1">1 FPS</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">Camera Source</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="0">Default Camera</option>
-                  <option value="1">External Camera</option>
-                  <option value="rtsp">RTSP Stream</option>
                 </select>
               </div>
             </div>
