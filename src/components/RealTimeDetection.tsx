@@ -51,7 +51,7 @@ const RealTimeDetection: React.FC = () => {
       ]);
 
       // Handle fire detection counting
-      if (data.prediction === 'Fire' && parseFloat(data.probability) > 70) {
+      if (data.prediction === 'Fire' && parseFloat(data.probability) > 55) {
         setFireDetectionCount(prev => prev + 1);
       } else {
         setFireDetectionCount(0); // Reset counter if not fire
