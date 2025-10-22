@@ -7,7 +7,7 @@ from torchvision import transforms
 import torchvision.models as models
 import threading
 import time
-from email_service import EmailAlertService
+from sms_service import SMSAlertService
 
 # Initialize Flask app and SocketIO
 app = Flask(__name__)
@@ -16,8 +16,8 @@ app.config['SECRET_KEY'] = 'secret!'
 # Allow all origins for simplicity in development
 socketio = SocketIO(app, cors_allowed_origins="*") 
 
-# Initialize Email Alert Service
-email_service = EmailAlertService()
+# Initialize SMS Alert Service
+sms_service = SMSAlertService()
 
 # --- Model Loading (from your notebook) ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -74,9 +74,9 @@ def background_thread():
         
         prediction, prob = predict_from_frame(frame)
         
-        # Send email alert if fire detected with high confidence
-        if prediction == 'Fire' and prob >= email_service.fire_confidence_threshold:
-            email_service.send_fire_alert(prediction, prob)
+        # Send SMS alert if fire detected with high confidence
+        if prediction == 'Fire' and prob >= sms_service.fire_confidence_threshold:
+            sms_service.send_fire_alert(prediction, prob)
         
         # Send the prediction and probability to all connected clients
         socketio.emit('prediction_result', {'prediction': prediction, 'probability': f"{prob:.2f}"})
@@ -95,19 +95,17 @@ def connect():
             thread = socketio.start_background_task(target=background_thread)
     print("Client connected")
 
-@socketio.on('test_email')
-def test_email(data):
-    """Test email functionality"""
-    test_email_addr = data.get('email') if data else None
-    success, message = email_service.send_test_email(test_email_addr)
-    emit('email_test_result', {'success': success, 'message': message})
-
-@socketio.on('get_email_status')
-def get_email_status():
-    """Get email service status"""
-    status = email_service.get_status()
-    emit('email_status', status)
-
+@socketio.on('test_sms')
+def test_sms(data):
+    """Test SMS functionality"""
+    test_number = data.get('phone_number') if data else None
+    success, message = sms_service.send_test_message(test_number)
+@socketio.on('get_sms_status')
+def get_sms_status():
+    """Get SMS service status"""
+    status = sms_service.get_status()
+    emit('sms_status', status)
+    emit('sms_test_result', {'success': success, 'message': message})
 if __name__ == '__main__':
     # Run the server
     socketio.run(app, debug=True)

@@ -6,4 +6,5 @@ flask-socketio>=5.0.0
 pillow>=8.0.0
 python-socketio>=5.0.0
 eventlet>=0.31.0
+twilio>=8.0.0
 python-dotenv>=1.0.0

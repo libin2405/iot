@@ -413,66 +413,60 @@ const RealTimeDetection: React.FC = () => {
         </div>
       </div>
 
-      {/* Email Alert Configuration */}
+      {/* SMS Alert Configuration */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Email Alert System</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">SMS Alert System</h3>
         
-        {/* Email Status */}
+        {/* SMS Status */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
             <h4 className="font-medium text-gray-700 mb-3">System Status</h4>
-            {emailStatus ? (
+            {smsStatus ? (
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <span className="text-sm text-gray-600">Email Service</span>
-                  <span className={`text-sm font-medium ${emailStatus.enabled ? 'text-green-600' : 'text-red-600'}`}>
-                    {emailStatus.enabled ? '✅ Enabled' : '❌ Disabled'}
+                  <span className="text-sm text-gray-600">SMS Service</span>
+                  <span className={`text-sm font-medium ${smsStatus.enabled ? 'text-green-600' : 'text-red-600'}`}>
+                    {smsStatus.enabled ? '✅ Enabled' : '❌ Disabled'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
                   <span className="text-sm text-gray-600">Emergency Contacts</span>
                   <span className="text-sm font-medium text-blue-600">
-                    {emailStatus.emergency_contacts} configured
+                    {smsStatus.emergency_contacts} configured
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
                   <span className="text-sm text-gray-600">Alerts Sent</span>
                   <span className="text-sm font-medium text-purple-600">
-                    {emailStatus.alert_count} total
+                    {smsStatus.alert_count} total
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
                   <span className="text-sm text-gray-600">Cooldown Period</span>
                   <span className="text-sm font-medium text-orange-600">
-                    {emailStatus.cooldown_minutes} minutes
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <span className="text-sm text-gray-600">SMTP Server</span>
-                  <span className="text-sm font-medium text-gray-600">
-                    {emailStatus.smtp_server}:{emailStatus.smtp_port}
+                    {smsStatus.cooldown_minutes} minutes
                   </span>
                 </div>
               </div>
             ) : (
               <div className="text-center py-4 text-gray-500">
-                <div className="text-sm">Connect to server to view email status</div>
+                <div className="text-sm">Connect to server to view SMS status</div>
               </div>
             )}
           </div>
           
           <div>
-            <h4 className="font-medium text-gray-700 mb-3">Test Email System</h4>
+            <h4 className="font-medium text-gray-700 mb-3">Test SMS System</h4>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm text-gray-600 mb-1">
-                  Test Email Address (optional)
+                  Test Phone Number (optional)
                 </label>
                 <input
-                  type="email"
-                  value={testEmail}
-                  onChange={(e) => setTestEmail(e.target.value)}
-                  placeholder="test@example.com"
+                  type="tel"
+                  value={testPhoneNumber}
+                  onChange={(e) => setTestPhoneNumber(e.target.value)}
+                  placeholder="+1234567890"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <div className="text-xs text-gray-500 mt-1">
@@ -480,14 +474,14 @@ const RealTimeDetection: React.FC = () => {
                 </div>
               </div>
               <button
-                onClick={testEmail}
-                disabled={!isConnected || !emailStatus?.enabled}
+                onClick={testSMS}
+                disabled={!isConnected || !smsStatus?.enabled}
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
-                Send Test Email
+                Send Test SMS
               </button>
               <button
-                onClick={getEmailStatus}
+                onClick={getSMSStatus}
                 disabled={!isConnected}
                 className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
               >
@@ -497,15 +491,14 @@ const RealTimeDetection: React.FC = () => {
           </div>
         </div>
         
-        {/* Email Configuration Info */}
+        {/* SMS Configuration Info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h5 className="font-medium text-blue-800 mb-2">📧 Email Alert Configuration</h5>
+          <h5 className="font-medium text-blue-800 mb-2">📱 SMS Alert Configuration</h5>
           <div className="text-sm text-blue-700 space-y-1">
-            <div>• Fire alerts are emailed when fire is detected with ≥70% confidence</div>
+            <div>• Fire alerts are sent when fire is detected with ≥70% confidence</div>
             <div>• 5-minute cooldown prevents spam alerts</div>
             <div>• Configure emergency contacts in backend/.env file</div>
-            <div>• Supports Gmail, Outlook, and other SMTP servers</div>
-            <div>• HTML formatted emails with detailed fire information</div>
+            <div>• Requires Twilio account for SMS functionality</div>
           </div>
         </div>
       </div>
