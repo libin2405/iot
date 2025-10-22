@@ -1,25 +1,32 @@
-import torch
-import cv2
+import os
 from flask import Flask
 from flask_socketio import SocketIO, emit
+import torch
+import cv2
 from PIL import Image
 from torchvision import transforms
 import torchvision.models as models
 import threading
-import time
-from sms_service import SMSAlertService
+from dotenv import load_dotenv
+
+# --- Load Environment Variables ---
+# This finds the .env file in the same folder as app.py
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path=dotenv_path)
+# --- End of .env loading ---
+
+# Import the SMS service *after* loading .env
+from email_service import EmailAlertService
 
 # Initialize Flask app and SocketIO
 app = Flask(__name__)
-# Replace with a secret key
 app.config['SECRET_KEY'] = 'secret!'
-# Allow all origins for simplicity in development
 socketio = SocketIO(app, cors_allowed_origins="*") 
 
 # Initialize SMS Alert Service
-sms_service = SMSAlertService()
+email_service = EmailAlertService()
 
-# --- Model Loading (from your notebook) ---
+# --- Model Loading ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = models.resnet50(weights=None)
 model.fc = torch.nn.Sequential(
@@ -28,7 +35,13 @@ model.fc = torch.nn.Sequential(
     torch.nn.Linear(128, 3),
     torch.nn.Softmax(dim=1)
 )
-model.load_state_dict(torch.load('./trained-models/best_model.pt', map_location=device))
+try:
+    model.load_state_dict(torch.load('./trained-models/best_model.pt', map_location=device))
+except FileNotFoundError:
+    print("WARNING: Model file './trained-models/best_model.pt' not found. AI detection will not work.")
+except Exception as e:
+    print(f"Error loading model: {e}")
+    
 model.to(device)
 model.eval()
 
@@ -74,14 +87,13 @@ def background_thread():
         
         prediction, prob = predict_from_frame(frame)
         
-        # Send SMS alert if fire detected with high confidence
-        if prediction == 'Fire' and prob >= sms_service.fire_confidence_threshold:
-            sms_service.send_fire_alert(prediction, prob)
+        # Send SMS alert if fire detected
+        email_service.send_fire_alert(prediction, prob)
         
-        # Send the prediction and probability to all connected clients
+        # Send the prediction to all connected clients
         socketio.emit('prediction_result', {'prediction': prediction, 'probability': f"{prob:.2f}"})
         
-        # Control the frame rate to about 10 FPS
+        # Control the frame rate
         socketio.sleep(0.1) 
     
     cap.release()
@@ -97,15 +109,26 @@ def connect():
 
 @socketio.on('test_sms')
 def test_sms(data):
-    """Test SMS functionality"""
+    """Handles test SMS request from frontend"""
+    print(f"Received test_sms request with data: {data}")
     test_number = data.get('phone_number') if data else None
-    success, message = sms_service.send_test_message(test_number)
+    
+    # Call the service and get the result
+    success, message = email_service.send_test_message(test_number)
+    
+    # Emit the result back to the frontend
+    emit('sms_test_result', {'success': success, 'message': message})
+
 @socketio.on('get_sms_status')
 def get_sms_status():
     """Get SMS service status"""
-    status = sms_service.get_status()
+    print("Received get_sms_status request")
+    status = email_service.get_status()
+    
+    # Emit the status back to the frontend
     emit('sms_status', status)
-    emit('sms_test_result', {'success': success, 'message': message})
+
 if __name__ == '__main__':
     # Run the server
-    socketio.run(app, debug=True)
+    print("Starting Flask-SocketIO server...")
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
