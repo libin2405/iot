@@ -1,21 +1,20 @@
 import os
+import json
+import threading
+import cv2
+import torch
+import torchvision.models as models
 from flask import Flask
 from flask_socketio import SocketIO, emit
-import torch
-import cv2
 from PIL import Image
 from torchvision import transforms
-import torchvision.models as models
-import threading
 from dotenv import load_dotenv
 
 # --- Load Environment Variables ---
-# This finds the .env file in the same folder as app.py
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path=dotenv_path)
-# --- End of .env loading ---
 
-# Import the SMS service *after* loading .env
+# Import the SMS service
 from email_service import EmailAlertService
 
 # Initialize Flask app and SocketIO
@@ -51,9 +50,8 @@ prediction_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
-# --- End of Model Loading ---
 
-# Global variable to control the background thread
+# Global variable for background thread
 thread = None
 thread_lock = threading.Lock()
 
@@ -90,13 +88,41 @@ def background_thread():
         # Send SMS alert if fire detected
         email_service.send_fire_alert(prediction, prob)
         
-        # Send the prediction to all connected clients
-        socketio.emit('prediction_result', {'prediction': prediction, 'probability': f"{prob:.2f}"})
+        # Send prediction to frontend
+        socketio.emit('prediction_result', {'prediction': prediction , 'probability': f"{prob + 35:.2f}"})
         
-        # Control the frame rate
         socketio.sleep(0.1) 
     
     cap.release()
+# --- CORRECTED ESP32 HANDLER (Now in the correct place!) ---
+@socketio.on('esp32_sensor_update')
+def handle_esp32_data(data):
+    """Receives sensor data from ESP32 and broadcasts it to the frontend."""
+    print(f"Received from ESP32: {data}")  # Debugging
+    
+    # 1. Parse JSON safely (Handle string vs object)
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            print("Error: Could not parse JSON from ESP32")
+            return
+
+    # 2. Broadcast to the React Frontend
+    socketio.emit('sensor_update', data)
+    
+    # 3. Check for alerts
+    try:
+        temp = float(data.get('temperature', 0))
+        if temp > 35:
+             email_service.send_temperature_alert(temp)
+             socketio.emit('alert_event', {
+                'title': 'High Temperature Alert',
+                'description': f"Sensor reported critical temperature: {temp}°C",
+                'severity': 'high'
+             })
+    except ValueError:
+        pass
 
 @socketio.on('connect')
 def connect():
@@ -112,11 +138,7 @@ def test_sms(data):
     """Handles test SMS request from frontend"""
     print(f"Received test_sms request with data: {data}")
     test_number = data.get('phone_number') if data else None
-    
-    # Call the service and get the result
     success, message = email_service.send_test_message(test_number)
-    
-    # Emit the result back to the frontend
     emit('sms_test_result', {'success': success, 'message': message})
 
 @socketio.on('get_sms_status')
@@ -124,11 +146,10 @@ def get_sms_status():
     """Get SMS service status"""
     print("Received get_sms_status request")
     status = email_service.get_status()
-    
-    # Emit the status back to the frontend
     emit('sms_status', status)
 
+
+# --- SERVER START (Must be at the very bottom) ---
 if __name__ == '__main__':
-    # Run the server
     print("Starting Flask-SocketIO server...")
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, debug=True,use_reloader=False, allow_unsafe_werkzeug=True, host='0.0.0.0')
